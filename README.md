@@ -1,4 +1,4 @@
-# Rubik's Cube 3D
+[text](../ita-sky-common-components/.github)# Rubik's Cube 3D
 
 An interactive 3D Rubik's Cube built with React and Three.js.
 
@@ -68,4 +68,18 @@ src/
 ## License
 
 MIT
-# rubikCubeApp
+
+## Node.js Version Requirement
+
+This project requires **Node.js 20.19.0** or newer (or Node.js 22.12.0+). Vite will not run on earlier versions.
+
+If you use [nvm](https://github.com/nvm-sh/nvm), you can run:
+
+```bash
+nvm install
+nvm use
+```
+
+This will automatically use the version specified in `.nvmrc`.
+
+If you do not use nvm, please upgrade your Node.js installation to at least 20.19.0.
