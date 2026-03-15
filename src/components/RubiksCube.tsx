@@ -13,16 +13,23 @@ function easeInOutCubic(t: number) {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
 
+export interface QueuedMove {
+  face: string;
+  direction: 'CW' | 'CCW';
+  source?: 'solver' | 'user';
+  sessionId?: string;
+}
+
 interface RubiksCubeProps {
   cubies: any[];
-  moveQueueRef: React.RefObject<any[]>;
-  onMoveDone: (move: any) => void;
+  moveQueueRef: React.RefObject<QueuedMove[]>;
+  onMoveDone: (move: QueuedMove) => void;
   onAnimatingChange?: (isAnimating: boolean) => void;
 }
 
 interface AnimationRef {
   active: boolean;
-  move: any;
+  move: QueuedMove | null;
   progress: number;
   axis: [number, number, number] | null;
   angle: number;
@@ -59,7 +66,6 @@ function getMaterialsFromFaceColors(
 export default function RubiksCube({ cubies, moveQueueRef, onMoveDone, onAnimatingChange }: RubiksCubeProps) {
   const cubiesRef = useRef(cubies);
 
-  // ✅ Cache de materiales dentro del componente — se limpia correctamente con el ciclo de vida
   const materialsCache = useRef(new Map<string, THREE.MeshStandardMaterial[]>());
 
   const geometry = useMemo(
@@ -82,7 +88,6 @@ export default function RubiksCube({ cubies, moveQueueRef, onMoveDone, onAnimati
     cubiesRef.current = cubies;
   }, [cubies]);
 
-  // Limpia materiales de cubies que ya no existen
   useEffect(() => {
     const currentIds = new Set(cubies.map((c: any) => c.id));
     for (const id of materialsCache.current.keys()) {
@@ -101,6 +106,7 @@ export default function RubiksCube({ cubies, moveQueueRef, onMoveDone, onAnimati
     if (!anim.active) {
       if (queue.length === 0) return;
       const move = queue.shift();
+      if (!move) return;
       const face = selectFace(cubiesRef.current, move.face);
       const ids = new Set<string>(face.map((c: any) => c.id));
       const group = animGroupRef.current;
@@ -144,10 +150,6 @@ export default function RubiksCube({ cubies, moveQueueRef, onMoveDone, onAnimati
             const mesh = meshRefs.current.get(id);
             if (mesh) {
               mainGroup.attach(mesh);
-              // After attach, Three.js bakes the world transform (including rotation)
-              // into the mesh's local transform. Reset rotation and snap position to
-              // the nearest integer grid coordinate so the face materials always align
-              // with world axes (no accumulated rotation drift).
               mesh.rotation.set(0, 0, 0);
               mesh.position.set(
                 Math.round(mesh.position.x),
@@ -159,12 +161,11 @@ export default function RubiksCube({ cubies, moveQueueRef, onMoveDone, onAnimati
         }
 
         group.rotation.set(0, 0, 0);
-        onMoveDone(anim.move);
+        if (anim.move) onMoveDone(anim.move);
         anim.active = false;
         anim.move = null;
         anim.affectedIds = null;
         anim.axis = null;
-        // Notify animating done only when queue is also empty
         if (moveQueueRef.current.length === 0) {
           onAnimatingChange?.(false);
         }

@@ -115,7 +115,40 @@ newFaceColors[dest] = cubie.faceColors[ permutation[dest] ?? dest ];
 ### 5.3 Legend Overlay
 
 * `ControlsLegend` renders a blurred glassmorphic card explaining each face, shortcut, and hint to drag for orbit.
-* Displays both lowercase key and “⇧Key” to indicate reverse direction.
+* Displays both lowercase key and "⇧Key" to indicate reverse direction.
+* When `isSolverLocked` is true a blue status chip "Auto-solve running" appears in the legend.
+
+### 5.4 Auto-Solve Button
+
+The Auto Solve feature is implemented entirely inside `RubiksCubeScene.tsx` with no changes to the `RubiksCube` animator.
+
+**State machine**
+
+| State | UI |
+| --- | --- |
+| `idle` | Blue "Auto Solve" button enabled when queue and animation are idle. |
+| `solving` | "Solving… ↻" indicator + red "Cancel" button; Shuffle and keyboard inputs blocked. |
+| `completed` | Toast "Cube solved in N moves!" shown; controls re-enabled. |
+| `cancelled` | Solver queue entries removed; controls immediately re-enabled. |
+
+**Implementation notes**
+
+* `handleAutoSolve` guards with `moveQueueRef.current.length === 0 && !isAnimating`. If busy, a tooltip "Finish current moves first" appears.
+* `solveCube` is called with an immutable snapshot of `cubiesRef.current`. The result is tagged with `{ source: 'solver', sessionId }` before being pushed to `moveQueueRef`.
+* `solveSessionRef` tracks `remainingMoves`; each `onMoveDone` call with a matching `sessionId` decrements the counter. Reaching 0 fires completion.
+* `handleCancelSolve` filters `moveQueueRef.current` by `sessionId` to remove only solver moves, then sets `isSolverLocked = false`.
+* The solver algorithm bodies (cross/F2L/OLL/PLL macros in `src/solver/macros/`) are still TODO stubs. `solveCube` currently returns `[]` for solved states and throws `SolverFailure('unsolved')` for scrambled states, which the scene catches and handles as a 0-move "solve".
+
+**Telemetry** (`src/utils/telemetry.ts`)
+
+The `track()` helper logs events to the console (stub). Events fired:
+
+| Event | When | Key Payload Fields |
+| --- | --- | --- |
+| `auto_solve_start` | Before solver runs | `sessionId`, `scrambleLength`, `algorithm` |
+| `auto_solve_complete` | All solver moves applied | `sessionId`, `moveCount`, `durationMs` |
+| `auto_solve_cancel` | User presses Cancel | `sessionId`, `remainingMoves` |
+| `auto_solve_error` | `solveCube` throws | `reason`, `scrambleLength` |
 
 ## 6. Testing Strategy
 
@@ -126,7 +159,33 @@ newFaceColors[dest] = cubie.faceColors[ permutation[dest] ?? dest ];
 * Check positional transforms for specific cubies to guard against matrix mistakes.
 * Ensure each move keeps 27 unique positions.
 
-### 6.2 Build/Test Pipeline
+### 6.2 Solver Unit Tests (`src/solver/__tests__/solveCube.test.ts`)
+
+* `solveCube(createInitialState())` resolves to `[]`.
+* Deterministic failure for scrambled states until macro bodies are implemented.
+* `SolverFailure` thrown with correct `code` for invalid snapshots and limit violations.
+* Input snapshot is not mutated by `solveCube`.
+
+### 6.3 Auto-Solve Logic Tests (`src/utils/__tests__/autoSolve.test.ts`)
+
+Pure data-layer tests for the auto-solve feature (no React, no WebGL):
+
+* `solveCube` integration for solved and scrambled states.
+* Queue tagging: moves get correct `source: 'solver'` and `sessionId`.
+* Busy guard: `canStartSolve` rejects when queue is non-empty or animating.
+* Cancel filtering: only matching `sessionId` moves are removed.
+* Completion tracking: `remainingMoves` decrement triggers completion at 0.
+* Telemetry payload structure validation for all four events.
+
+### 6.4 Queue Cancel Regression Tests (`src/utils/__tests__/moveQueueCancel.test.ts`)
+
+* Mixed solver + user queue: cancel removes only solver moves.
+* Two solver sessions in queue: cancelling A leaves B intact.
+* Non-existent sessionId cancel: queue unchanged.
+* `remainingMoves` resets to 0 after any cancel.
+* New session starts cleanly after cancel (no stale state).
+
+### 6.5 Build/Test Pipeline
 
 * `npm run build` → Vite builds the React app.
 * `npx vitest run` (or `npm test`) executes the suite in a Node environment per `vite.config.js` (tests match `src/**/*.test.ts(x)`).

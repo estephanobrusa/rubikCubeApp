@@ -1,7 +1,8 @@
 import { CUBIE_POSITIONS, FACE_COLORS, Cubie, FaceColors } from './cubeGeometry';
 
+export type CubePosition = [number, number, number];
+
 export function createInitialState(): Cubie[] {
-  console.log("🚀 ~ createInitialState ~ createInitialState:")
   return CUBIE_POSITIONS.map(({ x, y, z }) => {
     const faceColors: FaceColors = {
       right:  x === 1  ? FACE_COLORS.right  : undefined,
@@ -13,10 +14,18 @@ export function createInitialState(): Cubie[] {
     };
     return {
       id: `cubie-${x}-${y}-${z}`,
-      position: [x, y, z],
+      position: [x, y, z] as CubePosition,
       faceColors,
     };
   });
+}
+
+export function buildStateSnapshot(cubies: Readonly<Cubie[]>): Cubie[] {
+  return cubies.map((cubie) => ({
+    id: cubie.id,
+    position: [cubie.position[0], cubie.position[1], cubie.position[2]] as CubePosition,
+    faceColors: { ...cubie.faceColors },
+  }));
 }
 
 const FACE_AXIS: Record<FaceKey, [number, number]> = {
@@ -28,42 +37,45 @@ const FACE_AXIS: Record<FaceKey, [number, number]> = {
   B: [2, -1],
 };
 
-type FaceKey = 'R' | 'L' | 'U' | 'D' | 'F' | 'B';
-type DirectionKey = 'CW' | 'CCW';
+export type FaceKey = 'R' | 'L' | 'U' | 'D' | 'F' | 'B';
+export type DirectionKey = 'CW' | 'CCW';
 
 export function selectFace(state: Cubie[], face: string) {
   const [axis, value] = FACE_AXIS[face as FaceKey];
   return state.filter((cubie) => cubie.position[axis] === value);
 }
 
-export const ROTATION_TRANSFORMS: Record<FaceKey, Record<DirectionKey, (pos: number[]) => number[]>> = {
+export const ROTATION_TRANSFORMS: Record<FaceKey, Record<DirectionKey, (pos: CubePosition) => CubePosition>> = {
   R: {
-    CW:  ([x, y, z]: number[]) => [x, z, -y],
-    CCW: ([x, y, z]: number[]) => [x, -z, y],
+    CW:  ([x, y, z]) => [x, z, -y],
+    CCW: ([x, y, z]) => [x, -z, y],
   },
   L: {
-    CW:  ([x, y, z]: number[]) => [x, -z, y],
-    CCW: ([x, y, z]: number[]) => [x, z, -y],
+    CW:  ([x, y, z]) => [x, -z, y],
+    CCW: ([x, y, z]) => [x, z, -y],
   },
   U: {
-    CW:  ([x, y, z]: number[]) => [-z, y, x],
-    CCW: ([x, y, z]: number[]) => [z, y, -x],
+    CW:  ([x, y, z]) => [-z, y, x],
+    CCW: ([x, y, z]) => [z, y, -x],
   },
   D: {
-    CW:  ([x, y, z]: number[]) => [z, y, -x],
-    CCW: ([x, y, z]: number[]) => [-z, y, x],
+    CW:  ([x, y, z]) => [z, y, -x],
+    CCW: ([x, y, z]) => [-z, y, x],
   },
   F: {
-    CW:  ([x, y, z]: number[]) => [-y, x, z],
-    CCW: ([x, y, z]: number[]) => [y, -x, z],
+    CW:  ([x, y, z]) => [y, -x, z],
+    CCW: ([x, y, z]) => [-y, x, z],
   },
   B: {
-    CW:  ([x, y, z]: number[]) => [y, -x, z],
-    CCW: ([x, y, z]: number[]) => [-y, x, z],
+    CW:  ([x, y, z]) => [-y, x, z],
+    CCW: ([x, y, z]) => [y, -x, z],
   },
 };
 
-export function applyMove(state: Cubie[], { face, direction }: { face: string, direction: string }) {
+export function applyMove(
+  state: Cubie[],
+  { face, direction }: { face: string; direction: string },
+): Cubie[] {
   const [axis, value] = FACE_AXIS[face as FaceKey];
   const transform = ROTATION_TRANSFORMS[face as FaceKey][direction as DirectionKey];
 
@@ -79,12 +91,12 @@ export function applyMove(state: Cubie[], { face, direction }: { face: string, d
       CCW: { right: 'back',  front: 'right', left: 'front', back: 'left',  top: 'top', bottom: 'bottom' },
     },
     F: {
-      CW:  { left: 'top',  bottom: 'left', right: 'bottom', top: 'right', front: 'front', back: 'back' },
-      CCW: { right: 'top', bottom: 'right', left: 'bottom', top: 'left',  front: 'front', back: 'back' },
+      CW:  { right: 'top', bottom: 'right', left: 'bottom', top: 'left',  front: 'front', back: 'back' },
+      CCW: { left: 'top',  bottom: 'left', right: 'bottom', top: 'right', front: 'front', back: 'back' },
     },
     B: {
-      CW:  { right: 'top', bottom: 'right', left: 'bottom', top: 'left',  front: 'front', back: 'back' },
-      CCW: { left: 'top',  bottom: 'left',  right: 'bottom', top: 'right', front: 'front', back: 'back' },
+      CW:  { left: 'top',  bottom: 'left',  right: 'bottom', top: 'right', front: 'front', back: 'back' },
+      CCW: { right: 'top', bottom: 'right', left: 'bottom', top: 'left',  front: 'front', back: 'back' },
     },
     R: {
       CW:  { top: 'front', back: 'top',  bottom: 'back', front: 'bottom', right: 'right', left: 'left' },
@@ -99,7 +111,7 @@ export function applyMove(state: Cubie[], { face, direction }: { face: string, d
   return state.map((cubie) => {
     if (cubie.position[axis] !== value) return cubie;
 
-    const newPosition = transform(cubie.position);
+    const newPosition = transform(cubie.position as CubePosition);
     const permutation = FACE_PERMUTATION[face as FaceKey][direction as DirectionKey];
     const newFaceColors: FaceColors = {};
 
@@ -109,7 +121,7 @@ export function applyMove(state: Cubie[], { face, direction }: { face: string, d
       newFaceColors[dest] = cubie.faceColors[src];
     });
 
-    return { id: cubie.id, position: newPosition, faceColors: newFaceColors };
+    return { id: cubie.id, position: newPosition, faceColors: newFaceColors } satisfies Cubie;
   });
 }
 

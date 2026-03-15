@@ -17,7 +17,7 @@ export interface Cubie {
 
 export const FACE_COLORS: Record<string, string> = {
   right: '#FFD500', // yellow
-  left: '#FF9900', // orange (más intenso)
+  left: '#FF9900', // orange
   top: '#FFFFFF', // white
   bottom: '#009B48', // green
   front: '#C41E3A', // red

@@ -76,6 +76,14 @@ function diffStates(a: Cubie[], b: Cubie[]): string {
   return diffs.join('\n');
 }
 
+function findCubieByPosition(cubies: Cubie[], position: [number, number, number]): Cubie | undefined {
+  return cubies.find((c) =>
+    c.position[0] === position[0] &&
+    c.position[1] === position[1] &&
+    c.position[2] === position[2]
+  );
+}
+
 describe('createInitialState', () => {
   it('has 27 cubies', () => {
     expect(createInitialState().length).toBe(27);
@@ -299,6 +307,34 @@ describe('specific face color checks after single moves', () => {
       c.position[0] === 0 && c.position[1] === 1 && c.position[2] === 1
     );
     expect(moved).toBeDefined();
+  });
+
+  describe('front/back rotation direction', () => {
+    it('F CW rotates the top-front edge to the right-front edge', () => {
+      const initial = createInitialState();
+      const before = findCubieByPosition(initial, [0, 1, 1]);
+      expect(before).toBeDefined();
+
+      const after = applyMove(initial, { face: 'F', direction: 'CW' });
+      const moved = findCubieByPosition(after, [1, 0, 1]);
+      expect(moved).toBeDefined();
+
+      expect(moved!.faceColors.front).toBe(before!.faceColors.front);
+      expect(moved!.faceColors.right).toBe(before!.faceColors.top);
+    });
+
+    it('B CW rotates the top-back edge to the left-back edge', () => {
+      const initial = createInitialState();
+      const before = findCubieByPosition(initial, [0, 1, -1]);
+      expect(before).toBeDefined();
+
+      const after = applyMove(initial, { face: 'B', direction: 'CW' });
+      const moved = findCubieByPosition(after, [-1, 0, -1]);
+      expect(moved).toBeDefined();
+
+      expect(moved!.faceColors.back).toBe(before!.faceColors.back);
+      expect(moved!.faceColors.left).toBe(before!.faceColors.top);
+    });
   });
 });
 
