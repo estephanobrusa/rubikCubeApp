@@ -1,6 +1,7 @@
 import { CUBIE_POSITIONS, FACE_COLORS, Cubie, FaceColors } from './cubeGeometry';
 
 export function createInitialState(): Cubie[] {
+  console.log("🚀 ~ createInitialState ~ createInitialState:")
   return CUBIE_POSITIONS.map(({ x, y, z }) => {
     const faceColors: FaceColors = {
       right:  x === 1  ? FACE_COLORS.right  : undefined,
@@ -65,9 +66,50 @@ export const ROTATION_TRANSFORMS: Record<FaceKey, Record<DirectionKey, (pos: num
 export function applyMove(state: Cubie[], { face, direction }: { face: string, direction: string }) {
   const [axis, value] = FACE_AXIS[face as FaceKey];
   const transform = ROTATION_TRANSFORMS[face as FaceKey][direction as DirectionKey];
+
+  // Tabla semántica: dest: src
+  // Cada entrada significa "la cara DEST recibe el color que tenía SRC"
+  const FACE_PERMUTATION: Record<FaceKey, Record<DirectionKey, Record<keyof FaceColors, keyof FaceColors>>> = {
+    U: {
+      CW:  { right: 'back',  front: 'right', left: 'front', back: 'left',  top: 'top', bottom: 'bottom' },
+      CCW: { right: 'front', back: 'right',  left: 'back',  front: 'left', top: 'top', bottom: 'bottom' },
+    },
+    D: {
+      CW:  { right: 'front', back: 'right',  left: 'back',  front: 'left', top: 'top', bottom: 'bottom' },
+      CCW: { right: 'back',  front: 'right', left: 'front', back: 'left',  top: 'top', bottom: 'bottom' },
+    },
+    F: {
+      CW:  { left: 'top',  bottom: 'left', right: 'bottom', top: 'right', front: 'front', back: 'back' },
+      CCW: { right: 'top', bottom: 'right', left: 'bottom', top: 'left',  front: 'front', back: 'back' },
+    },
+    B: {
+      CW:  { right: 'top', bottom: 'right', left: 'bottom', top: 'left',  front: 'front', back: 'back' },
+      CCW: { left: 'top',  bottom: 'left',  right: 'bottom', top: 'right', front: 'front', back: 'back' },
+    },
+    R: {
+      CW:  { top: 'front', back: 'top',  bottom: 'back', front: 'bottom', right: 'right', left: 'left' },
+      CCW: { front: 'top', top: 'back',  back: 'bottom', bottom: 'front', right: 'right', left: 'left' },
+    },
+    L: {
+      CW:  { front: 'top', top: 'back',  back: 'bottom', bottom: 'front', right: 'right', left: 'left' },
+      CCW: { top: 'front', back: 'top',  bottom: 'back', front: 'bottom', right: 'right', left: 'left' },
+    },
+  };
+
   return state.map((cubie) => {
     if (cubie.position[axis] !== value) return cubie;
-    return { id: cubie.id, position: transform(cubie.position) };
+
+    const newPosition = transform(cubie.position);
+    const permutation = FACE_PERMUTATION[face as FaceKey][direction as DirectionKey];
+    const newFaceColors: FaceColors = {};
+
+    // dest recibe el color de src
+    (Object.keys(cubie.faceColors) as (keyof FaceColors)[]).forEach((dest) => {
+      const src = permutation[dest] ?? dest;
+      newFaceColors[dest] = cubie.faceColors[src];
+    });
+
+    return { id: cubie.id, position: newPosition, faceColors: newFaceColors };
   });
 }
 
